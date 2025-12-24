@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,7 +30,7 @@ app.use('/api/dashboard', require('./routes/dashboard.routes'));
 //asislearn
 app.use("/api/materials", require("./routes/material.routes"));
 
-app.use("/uploads", express.static("uploads"));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // (nanti)
 // app.use('/api/posts', require('./routes/post.routes'));
