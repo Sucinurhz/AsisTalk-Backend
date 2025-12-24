@@ -2,72 +2,82 @@ const db = require("../config/db");
 const fs = require("fs").promises;
 const path = require("path");
 
-// Sesuaikan BASE_URL agar bisa diakses Emulator
-const BASE_URL = "http://10.0.2.2:3000";
+const BASE_URL = "http://10.0.2.2:3000"; 
 
-// --- 1. UPLOAD MATERI ---
+// --- 1. UPLOAD MATERIAL ---
 exports.uploadMaterial = async (req, res) => {
-    try {
-        const { subject, topic, description } = req.body;
-        const file = req.file;
+  try {
+    const { subject, topic, description } = req.body;
+    const file = req.file;
 
-        if (!subject || !topic || !file) {
-            return res.status(400).json({
-                success: false,
-                message: "Subject, topic, dan file wajib diisi"
-            });
-        }
-
-        const ext = path.extname(file.originalname).toLowerCase();
-        let fileType = "OTHER";
-        if (ext === ".pdf") fileType = "PDF";
-        else if ([".mp4", ".mov", ".avi", ".mkv"].includes(ext)) fileType = "VIDEO";
-        else if ([".jpg", ".jpeg", ".png", ".gif"].includes(ext)) fileType = "IMAGE";
-
-        const dbFilePath = file.path.replace(/\\/g, "/");
-
-        const [result] = await db.query(
-            `INSERT INTO materials 
-                (user_id, subject, topic, description, file_type, file_name, file_path) 
-               VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [req.user.id, subject, topic, description || null, fileType, file.originalname, dbFilePath]
-        );
-
-        res.status(201).json({
-            success: true,
-            message: "Materi berhasil diupload",
-            data: {
-                id: result.insertId,
-                file_path: `${BASE_URL}/${dbFilePath}`
-            }
-        });
-    } catch (error) {
-        console.error("UPLOAD ERROR:", error);
-        res.status(500).json({ success: false, message: "Gagal upload materi" });
+    if (!subject || !topic || !file) {
+      return res.status(400).json({ success: false, message: "Subject, topic, dan file wajib diisi" });
     }
+
+    // Tentukan tipe file otomatis
+    const ext = path.extname(file.originalname).toLowerCase();
+    let fileType = "OTHER";
+    if (ext === ".pdf") fileType = "PDF";
+    else if ([".mp4", ".mov", ".avi", ".mkv"].includes(ext)) fileType = "VIDEO";
+    else if ([".jpg", ".jpeg", ".png", ".gif"].includes(ext)) fileType = "IMAGE";
+    else if ([".doc", ".docx"].includes(ext)) fileType = "DOC";
+
+    const relativeFilePath = `uploads/materials/${file.filename}`;
+    
+    const [result] = await db.query(
+    `INSERT INTO materials (user_id, subject, topic, description, file_type, file_name, file_path)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [req.user.id, subject, topic, description || null, fileType, file.originalname, relativeFilePath]
+    );
+
+
+    res.status(201).json({
+      success: true,
+      message: "Materi berhasil diupload",
+      data: {
+        id: result.insertId,
+        subject,
+        topic,
+        file_type: fileType,
+        file_name: file.originalname,
+        file_path: `${BASE_URL}/${relativeFilePath}`
+      }
+    });
+  } catch (error) {
+    console.error("UPLOAD ERROR:", error);
+    res.status(500).json({ success: false, message: "Gagal upload materi" });
+  }
 };
 
-// --- 2. GET ALL MATERIALS ---
+// Get semua materi
 exports.getAllMaterials = async (req, res) => {
-    try {
-        const [rows] = await db.query(`
-            SELECT m.*, u.full_name AS author_name, u.profile_image
-            FROM materials m
-            JOIN users u ON m.user_id = u.id
-            ORDER BY m.created_at DESC
-        `);
+  try {
+    const [rows] = await db.query(`
+      SELECT m.*, u.full_name AS author_name, u.profile_image
+      FROM materials m
+      JOIN users u ON m.user_id = u.id
+      ORDER BY m.created_at DESC
+    `);
 
-        const formattedData = rows.map(row => ({
-            ...row,
-            file_path: row.file_path ? `${BASE_URL}/${row.file_path}` : null,
-            profile_image: row.profile_image ? `${BASE_URL}/${row.profile_image}` : null
-        }));
+    const formattedData = rows.map(row => {
+      const fixPath = (p) => {
+        if (!p) return null;
+        if (p.startsWith("http")) return p;
+        return `${BASE_URL}/${p.replace(/\\/g, "/")}`;
+      };
 
-        res.status(200).json({ success: true, data: formattedData });
-    } catch (error) {
-        console.error("GET ALL ERROR:", error);
-        res.status(500).json({ success: false, message: "Gagal mengambil data" });
-    }
+      return {
+        ...row,
+        file_path: fixPath(row.file_path),
+        profile_image: fixPath(row.profile_image)
+      };
+    });
+
+    res.status(200).json({ success: true, data: formattedData });
+  } catch (error) {
+    console.error("GET ALL ERROR:", error);
+    res.status(500).json({ success: false, message: "Gagal mengambil data" });
+  }
 };
 
 // --- 3. GET MATERIAL BY ID ---
@@ -113,14 +123,22 @@ exports.updateMaterial = async (req, res) => {
         let fileType = null;
         let fileName = null;
 
-        if (file) {
-            if (dbFilePath) {
-                try { await fs.unlink(path.resolve(dbFilePath)); } catch (err) { }
-            }
-            dbFilePath = file.path.replace(/\\/g, "/");
-            fileType = path.extname(file.originalname).toUpperCase().replace(".", "");
-            fileName = file.originalname;
-        }
+       if (file) {
+    if (dbFilePath) {
+        try { await fs.unlink(path.resolve(dbFilePath)); } catch (err) { }
+    }
+    dbFilePath = file.path.replace(/\\/g, "/");
+
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === ".pdf") fileType = "PDF";
+    else if ([".mp4", ".mov", ".avi", ".mkv"].includes(ext)) fileType = "VIDEO";
+    else if ([".jpg", ".jpeg", ".png", ".gif"].includes(ext)) fileType = "IMAGE";
+    else if ([".doc", ".docx"].includes(ext)) fileType = "DOC";
+    else fileType = "OTHER";
+
+    fileName = file.originalname;
+}
+
 
         await db.query(`
             UPDATE materials 
