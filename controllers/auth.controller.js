@@ -58,6 +58,16 @@ exports.register = async (req, res) => {
     // 5️⃣ Simpan path foto
     const profileImagePath = `/uploads/profiles/${req.file.filename}`;
 
+    let validatedGender = 'Male'; // Default jika tidak terdeteksi
+    if (gender) {
+      const g = gender.toLowerCase();
+      if (g === 'p' || g === 'female' || g === 'perempuan') {
+        validatedGender = 'Female';
+      } else if (g === 'l' || g === 'male' || g === 'laki-laki') {
+        validatedGender = 'Male';
+      }
+    }
+
     // 6️⃣ Insert ke database
     await db.query(
       `INSERT INTO users
@@ -109,39 +119,34 @@ exports.login = async (req, res) => {
     return res.status(401).json({ message: 'Password salah' });
 
   const token = generateToken(user);
+  console.log("GENERATED TOKEN:", token);
 
   res.json({
-  success: true,
-  token,
+    success: true,
+    token,
     user: {
       id: user.id,
-      full_name: user.full_name,
-      username: user.username,
-      email: user.email,
-      phone_number: user.phone_number,
-      birth_date: user.birth_date,
-      gender: user.gender,
-      profile_image: user.profile_image
+      username: user.username
     }
-});
+  });
 };
 
 // getProfile
 exports.getProfile = async (req, res) => {
   try {
-    const { id } = req.params
+    const id = req.params.id || (req.user ? req.user.id : null);
 
     const [rows] = await db.query(
       `
       SELECT 
         id,
-        full_name AS fullName,
+        full_name,
         username,
         email,
-        phone_number AS phoneNumber,
-        birth_date AS birthDate,
+        phone_number,
+        birth_date,
         gender,
-        profile_image AS profileImage
+        profile_image
       FROM users
       WHERE id = ?
       `,

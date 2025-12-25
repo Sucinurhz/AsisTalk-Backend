@@ -3,30 +3,24 @@ const db = require('../config/db')
 // GET PROFILE
 exports.getProfile = async (req, res) => {
   try {
-    const { id } = req.params
+    const userId = req.user.id
 
-    const [rows] = await db.query(
-      `SELECT 
-        id,
-        full_name,
-        username,
-        email,
-        phone_number,
-        birth_date,
-        gender,
-        profile_image
-       FROM users
-       WHERE id = ?`,
-      [id]
+    const [user] = await db.query(
+      "SELECT id, full_name, username, email, phone, birth_date, gender, profile_image FROM users WHERE id = ?",
+      [userId]
     )
 
-    if (rows.length === 0) {
-      return res.status(404).json({ message: 'User not found' })
+    if (!user.length) {
+      return res.status(404).json({ message: "User not found" })
     }
 
-    res.json(rows[0])
-  } catch (err) {
-    res.status(500).json({ message: err.message })
+    res.json({
+      success: true,
+      user: user[0]
+    })
+
+  } catch (error) {
+    res.status(500).json({ message: "Server error" })
   }
 }
 

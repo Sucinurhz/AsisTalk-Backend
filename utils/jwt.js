@@ -1,12 +1,14 @@
 const jwt = require('jsonwebtoken');
 
+const SECRET = process.env.JWT_SECRET;
+
 exports.generateToken = (user) => {
   return jwt.sign(
     {
-      id: user.id,        // ← WAJIB ADA
+      id: user.id,
       username: user.username
     },
-    process.env.JWT_SECRET,
+    SECRET,
     { expiresIn: '7d' }
   );
 };

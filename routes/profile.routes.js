@@ -2,10 +2,18 @@ const express = require('express')
 const router = express.Router()
 const profileController = require('../controllers/profile.controller')
 
-// GET profile by id
-router.get('/:id', profileController.getProfile)
+const authMiddleware = require('../middleware/auth.middleware')
 
-// UPDATE profile
-router.put('/:id', profileController.updateProfile)
+router.get(
+  '/',
+  authMiddleware,
+  profileController.getProfile
+)
+
+router.put(
+  '/',
+  authMiddleware,
+  profileController.updateProfile
+)
 
 module.exports = router
